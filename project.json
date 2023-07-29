@@ -1,0 +1,10 @@
+{
+    "name": "截图贴图工具",
+    "main": "main.js",
+    "ignore": [
+        "build"
+    ],
+    "packageName": "com.tony.capture.snippet",
+    "versionName": "1.0.0",
+    "versionCode": 1
+}
