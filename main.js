@@ -1,5 +1,5 @@
 // 杀死当前同名脚本
-(() => { var g = engines.myEngine(); var e = engines.all(), n = e.length; var r = g.getSource() + ""; 1 < n && e.forEach(e => { var n = e.getSource() + ""; g.id !== e.id && n == r && e.forceStop() }) })();
+(() => { let g = engines.myEngine(); let e = engines.all(), n = e.length; let r = g.getSource() + ""; 1 < n && e.forEach(e => { let n = e.getSource() + ""; g.id !== e.id && n == r && e.forceStop() }) })();
 
 importClass(java.io.StringWriter)
 importClass(java.io.StringReader)
@@ -9,9 +9,10 @@ importClass(java.lang.StringBuilder)
 importClass(android.view.View)
 
 
-var resourceMonitor = require('./ResourceMonitor.js')(runtime, global)
+let resourceMonitor = require('./ResourceMonitor.js')(runtime, global)
+let FloatyButton = require('./FloatyButton.js')
 
-var stop = false
+let stop = false
 events.on('exit', () => {
   stop = true
 })
@@ -24,8 +25,8 @@ setTimeout(() => {
   }
 }, 30000)
 
-var captureImage, drawImage, originalImg, grayImg
-var displayPositions = ''
+let captureImage, drawImage, originalImg, grayImg
+let displayPositions = ''
 threads.start(function () {
   if (!requestScreenCapture()) {
     toast("请求截图失败")
@@ -39,14 +40,14 @@ threads.start(function () {
 })
 
 
-var device_width = device.width || originalImg.getWidth() || 1080
-var device_height = device.height || originalImg.getHeight() || 2340
+let device_width = device.width || originalImg.getWidth() || 1080
+let device_height = device.height || originalImg.getHeight() || 2340
 // 识别颜色类型 默认彩色
-var mode = 2
-var cutMode = false
+let mode = 2
+let cutMode = false
 //toastLog("截图成功")
 
-var canvasWindow = floaty.rawWindow(
+let canvasWindow = floaty.rawWindow(
   <vertical>
     <vertical id="vertical" bg="#aaaaaa" w="{{Math.floor(device_width)}}px" h="{{Math.floor(device_height*0.9)}}px" gravity="center">
       <horizontal id="horizontal" margin="5dp" w="*" gravity="center">
@@ -73,10 +74,6 @@ var canvasWindow = floaty.rawWindow(
   </vertical>
 )
 
-var miniWindow = floaty.window(
-  <button id="miniBtn" w="150px" h="150px" text="▽" alpha="0.7" />
-)
-
 function FloatyImage (image) {
   if (!image) {
     return
@@ -85,19 +82,41 @@ function FloatyImage (image) {
     return v.toFixed(1)
   }
   let forDrawImg = images.copy(image, true)
+  let drawScale = 1
+  let imageWidth = forDrawImg.getWidth()
+  let imageHeight = forDrawImg.getHeight()
   let _this = this
   this.lastScale = 0
-  this.hideDisplay = false
   this.displayInfo = {
     _displayDrawed: false,
+    _movingDrawed: false,
+    _hideDisplay: false,
     get displayDrawed () {
-      this._displayDrawed
+      return this._displayDrawed
     },
     set displayDrawed (value) {
       if (value != this._displayDrawed) {
-        console.log('change display drawed ', this._displayDrawed, ' to:', value, 'current hide:', _this.hideDisplay)
+        console.log('change display drawed ', this._displayDrawed, ' to:', value)
       }
       this._displayDrawed = value
+    },
+    get movingDrawed () {
+      return this._movingDrawed
+    },
+    set movingDrawed (value) {
+      if (value != this._movingDrawed) {
+        console.log('change moving drawed ', this._movingDrawed, ' to:', value)
+      }
+      this._movingDrawed = value
+    },
+    get hideDisplay () {
+      return this._hideDisplay
+    },
+    set hideDisplay (value) {
+      if (value != this._hideDisplay) {
+        console.log('change hide display ', this._hideDisplay, ' to:', value)
+      }
+      this._hideDisplay = value
     }
   }
   this.floatyCanvas = floaty.rawWindow(
@@ -125,9 +144,11 @@ function FloatyImage (image) {
     this.closed = true
     setTimeout(() => {
       if (this.floatyCanvas) {
+        this.floatyCanvas.canvas.setVisibility(View.GONE)
         this.floatyCanvas.close()
       }
       if (this.floatyCanvasMoving) {
+        this.floatyCanvasMoving.canvas.setVisibility(View.GONE)
         this.floatyCanvasMoving.close()
       }
       forDrawImg.recycle()
@@ -135,12 +156,12 @@ function FloatyImage (image) {
   }
 
   this.onMoving = function () {
-    _this.movingDrawed = false
-    if (this.hideDisplay) {
+    _this.displayInfo.movingDrawed = false
+    if (_this.displayInfo.hideDisplay) {
       // console.warn('current on moving duplicate invoke')
       return
     }
-
+    _this.displayInfo.hideDisplay = true
     ui.run(() => {
       _this.floatyCanvas.canvasContainer.attr('alpha', '0')
       _this.floatyCanvasMoving.canvasContainer.attr('alpha', '0.8')
@@ -148,77 +169,80 @@ function FloatyImage (image) {
       // 因为触控事件依赖，直接隐藏有几率导致卡死
       // _this.floatyCanvas.canvas.setVisibility(View.GONE)
       _this.floatyCanvasMoving.canvas.setVisibility(View.VISIBLE)
-      _this.hideDisplay = true
     })
   }
 
   this.onDisplay = function () {
-    if (!this.hideDisplay) {
+    if (!_this.displayInfo.hideDisplay) {
       // console.warn('current on display duplicate invoke')
       return
     }
     _this.displayInfo.displayDrawed = false
+    _this.displayInfo.hideDisplay = false
     ui.run(() => {
       _this.floatyCanvas.canvasContainer.attr('alpha', '1')
       _this.floatyCanvasMoving.canvasContainer.attr('alpha', '0')
 
       // _this.floatyCanvas.canvas.setVisibility(View.VISIBLE)
-      _this.floatyCanvasMoving.canvas.setVisibility(View.GONE)
-      _this.hideDisplay = false
+      setTimeout(() => {
+        ui.post(() => {
+          _this.floatyCanvasMoving.canvas.setVisibility(View.GONE)
+        })
+      }, 30)
     })
   }
 
-  let drawScale = 1
-  let imageWidth = forDrawImg.getWidth()
-  let imageHeight = forDrawImg.getHeight()
-
-  function _handleCanvasDraw (canvas) {
+  function _handleCanvasDraw (canvas, isDisplayCanvas) {
     if (_this.closed) {
       return
     }
-    if (_this.lastScale != drawScale) {
-      _this.displayInfo.displayDrawed = false
-      _this.movingDrawed = false
-    }
     try {
-      _this.lastScale = drawScale
+      if (_this.lastScale != drawScale) {
+        ui.run(function () {
+          _this.displayInfo.displayDrawed = false
+          _this.displayInfo.movingDrawed = false
+          if (isDisplayCanvas) {
+            _this.floatyCanvas.canvasContainer.attr('w', Math.floor(drawScale * imageWidth) + 'px')
+            _this.floatyCanvas.canvasContainer.attr('h', Math.floor(drawScale * imageHeight) + 'px')
+          } else {
+            _this.floatyCanvasMoving.canvasContainer.attr('w', Math.floor(drawScale * imageWidth) + 'px')
+            _this.floatyCanvasMoving.canvasContainer.attr('h', Math.floor(drawScale * imageHeight) + 'px')
+          }
+        })
+        _this.lastScale = drawScale
+      }
       // canvas.drawARGB(255, 0, 0, 0)
-      var paint = new Paint()
+      let paint = new Paint()
       paint.setTextAlign(Paint.Align.CENTER)
       paint.setStrokeWidth(1)
       paint.setStyle(Paint.Style.STROKE)
-      var matrix = new android.graphics.Matrix()
+      let matrix = new android.graphics.Matrix()
       matrix.postScale(drawScale, drawScale)
       paint.setARGB(255, 0, 0, 0)
       canvas.drawImage(forDrawImg, matrix, paint)
       paint.setARGB(255, 88, 88, 88)
       paint.setStrokeWidth(1)
       canvas.drawRect(convertArrayToRect([0, 0, canvas.getWidth(), canvas.getHeight()]), paint)
-      ui.run(function () {
-        _this.floatyCanvas.canvasContainer.attr('w', Math.floor(drawScale * imageWidth) + 'px')
-        _this.floatyCanvas.canvasContainer.attr('h', Math.floor(drawScale * imageHeight) + 'px')
-        _this.floatyCanvasMoving.canvasContainer.attr('w', Math.floor(drawScale * imageWidth) + 'px')
-        _this.floatyCanvasMoving.canvasContainer.attr('h', Math.floor(drawScale * imageHeight) + 'px')
-      })
+
     } catch (e) {
       //
     }
   }
   this.floatyCanvas.canvas.on("draw", (canvas) => {
-    if (_this.displayInfo.displayDrawed && _this.lastScale == drawScale) {
-      // console.warn('应当停止绘制')
-      return
-    }
-    _handleCanvasDraw(canvas)
+    // if (_this.displayInfo.displayDrawed && _this.lastScale == drawScale) {
+    //   // console.warn('应当停止绘制')
+    //   return
+    // }
+    _handleCanvasDraw(canvas, true)
     _this.displayInfo.displayDrawed = true
   })
 
   this.floatyCanvasMoving.canvas.on("draw", (canvas) => {
-    if (!_this.hideDisplay || _this.movingDrawed) {
+    if (!_this.displayInfo.hideDisplay) {
       return
     }
     _handleCanvasDraw(canvas)
-    _this.movingDrawed = true
+    _this.displayInfo.movingDrawed = true
   })
 
   let touchList = new Array
@@ -278,7 +302,7 @@ function FloatyImage (image) {
         setTimeout(() => _this.currentInScale = false, 50)
         let X = event.getX(0) - _this.startX
         let Y = event.getY(0) - _this.startY
-        console.log('move移动x', num(X), 'y', num(Y))
+        // console.log('move移动x', num(X), 'y', num(Y))
         _this.onMoving()
         ui.run(function () {
           _this.floatyCanvasMoving.setPosition(_this.ox + X, _this.oy + Y)
@@ -300,7 +324,7 @@ function FloatyImage (image) {
         _this.touchCount = 0
         let X = event.getX(0) - _this.startX
         let Y = event.getY(0) - _this.startY
-        console.log('up移动x', X, 'y', Y)
+        // console.log('up移动x', X, 'y', Y)
         ui.run(function () {
           _this.floatyCanvas.setPosition(_this.ox + X, _this.oy + Y)
         })
@@ -329,18 +353,9 @@ function FloatyImage (image) {
 }
 
 
-var canvasWindowCtrl = new FloatyController(canvasWindow, canvasWindow.btnMove, 1, canvasWindow.vertical)
-var miniWindowCtrl = new FloatyController(miniWindow, miniWindow.miniBtn)
-var canvasMove = canvasWindowCtrl.outScreen()
-var miniMove = miniWindowCtrl.outScreen()
+let canvasWindowCtrl = new FloatyController(canvasWindow, canvasWindow.btnMove, 1, canvasWindow.vertical)
 
-threads.start(function () {
-  sleep(100)
-  // 将mini按钮移动到屏幕外
-  miniMove = miniWindowCtrl.outScreen()
-  miniWindowCtrl.windowMoving(miniMove)
-})
-
+let canvasMove = canvasWindowCtrl.outScreen()
 
 canvasWindowCtrl.setClick(function () {
   //canvasWindow.disableFocus()
@@ -352,33 +367,34 @@ canvasWindowCtrl.setClick(function () {
       // 将CANVAS设为不可见 修改版中可以节省CPU占用
       canvasWindow.canvas.setVisibility(View.GONE)
     })
+    canvasWindowCtrl.isHide = true
     // 将mini按钮移动到屏幕外再贴边
-    miniWindowCtrl.windowMoving({ from: canvasMove.to, to: { X: canvasMove.to.X + 100, Y: canvasMove.to.Y + canvasWindow.getHeight() / 2 } })
-    miniWindowCtrl.windowMoving(miniWindowCtrl.toScreenEdge())
+    // miniWindowCtrl.windowMoving({ from: canvasMove.to, to: { X: canvasMove.to.X + 100, Y: canvasMove.to.Y + canvasWindow.getHeight() / 2 } })
+    // miniWindowCtrl.windowMoving(miniWindowCtrl.toScreenEdge())
   })
 })
 
-miniWindowCtrl.setClick(function () {
-  //canvasWindow.disableFocus()
-  threads.start(function () {
-    // 将mini按钮移动到屏幕外
-    miniMove = miniWindowCtrl.outScreen()
-    miniWindowCtrl.windowMoving(miniMove)
-    // 将canvas移动回屏幕内
-    ui.post(function () {
-      canvasWindow.canvas.setVisibility(View.VISIBLE)
-    })
-    // canvasWindowCtrl.windowMoving({ from: canvasMove.to, to: canvasWindowCtrl.centerXY(miniWindowCtrl.centerXY(miniMove.from).from).to })
-    canvasWindowCtrl.windowMoving({ from: { X: miniMove.to.X, Y: canvasMove.to.Y }, to: canvasMove.from })
-    canvasWindowCtrl.windowMoving(canvasWindowCtrl.intoScreen())
-  })
-})
+// miniWindowCtrl.setClick(function () {
+//   //canvasWindow.disableFocus()
+//   threads.start(function () {
+//     // 将mini按钮移动到屏幕外
+//     miniMove = miniWindowCtrl.outScreen()
+//     miniWindowCtrl.windowMoving(miniMove)
+//     // 将canvas移动回屏幕内
+//     ui.post(function () {
+//       canvasWindow.canvas.setVisibility(View.VISIBLE)
+//     })
+//     // canvasWindowCtrl.windowMoving({ from: canvasMove.to, to: canvasWindowCtrl.centerXY(miniWindowCtrl.centerXY(miniMove.from).from).to })
+//     canvasWindowCtrl.windowMoving({ from: { X: miniMove.to.X, Y: canvasMove.to.Y }, to: canvasMove.from })
+//     canvasWindowCtrl.windowMoving(canvasWindowCtrl.intoScreen())
+//   })
+// })
 
 
 canvasWindow.btnCapture.click(function () {
   threads.start(function () {
     // 隐藏悬浮窗
-    var canvasMove = canvasWindowCtrl.outScreen()
+    let canvasMove = canvasWindowCtrl.outScreen()
     canvasWindowCtrl.windowMoving(canvasMove)
     sleep(100)
     captureImage = captureScreen()
@@ -405,7 +421,7 @@ canvasWindow.region_position_horiz.click(function () {
 
 canvasWindow.btnColor.click(function () {
   threads.start(function () {
-    // var canvasMove = canvasWindowCtrl.outScreen()
+    // let canvasMove = canvasWindowCtrl.outScreen()
     // canvasWindowCtrl.windowMoving(canvasMove)
     if (mode == 1) {
       mode = 2
@@ -428,7 +444,7 @@ canvasWindow.cutOrPoint.on('click', () => {
   threads.start(function () {
     if (cutMode) {
       if (positions && positions.length === 4) {
-        var clipImg = convertAndClip(positions, data, drawImage)
+        let clipImg = convertAndClip(positions, data, drawImage)
         if (clipImg === null) {
           toastLog('未框选有效图片')
           return
@@ -454,11 +470,11 @@ canvasWindow.btnClose.on("click", () => {
   exit()
 })
 
-var paint = new Paint
+let paint = new Paint
 paint.setTextAlign(Paint.Align.CENTER)
 paint.setStrokeWidth(5)
 paint.setStyle(Paint.Style.STROKE)
-var data = {
+let data = {
   translate: {
     x: 0,
     y: 0
@@ -510,14 +526,14 @@ canvasWindow.canvas.on("draw", function (canvas) {
     }
 
     // 复制一份 避免闪退
-    var forDrawImg = tryCopy(drawImage)
+    let forDrawImg = tryCopy(drawImage)
     if (!forDrawImg) {
       return
     }
-    var w = canvas.getWidth()
-    var h = canvas.getHeight()
+    let w = canvas.getWidth()
+    let h = canvas.getHeight()
     paint.setStrokeWidth(5)
-    var matrix = new android.graphics.Matrix()
+    let matrix = new android.graphics.Matrix()
     matrix.postScale(data.scale, data.scale)
     matrix.postTranslate(data.translate.x, data.translate.y)
     paint.setARGB(255, 0, 0, 0)
@@ -533,7 +549,7 @@ canvasWindow.canvas.on("draw", function (canvas) {
     canvas.drawLine(w / 2 + 50, h / 2, w / 2 + 100, h / 2, paint)
     paint.setARGB(255, 0, 0, 255)
     canvas.drawLine(w / 2, h / 2 + 50, w / 2, h / 2 + 100, paint)
-    var S = calculateCoordinates(w / 2, h / 2, data, forDrawImg)
+    let S = calculateCoordinates(w / 2, h / 2, data, forDrawImg)
     forDrawImg.recycle()
     globalPointColor = S
     if (cutMode && positions && positions.length === 4) {
@@ -552,28 +568,28 @@ canvasWindow.canvas.on("draw", function (canvas) {
 function printExceptionStack (e) {
   if (e) {
     console.error(util.format('fileName: %s line:%s typeof e:%s', e.fileName, e.lineNumber, typeof e))
-    var throwable = null
+    let throwable = null
     if (e.javaException) {
       throwable = e.javaException
     } else if (e.rhinoException) {
       throwable = e.rhinoException
     }
     if (throwable) {
-      var scriptTrace = new StringBuilder(e.message == null ? '' : e.message + '\n')
-      var stringWriter = new StringWriter()
-      var writer = new PrintWriter(stringWriter)
+      let scriptTrace = new StringBuilder(e.message == null ? '' : e.message + '\n')
+      let stringWriter = new StringWriter()
+      let writer = new PrintWriter(stringWriter)
       throwable.printStackTrace(writer)
       writer.close()
-      var bufferedReader = new BufferedReader(new StringReader(stringWriter.toString()))
-      var line
+      let bufferedReader = new BufferedReader(new StringReader(stringWriter.toString()))
+      let line
       while ((line = bufferedReader.readLine()) != null) {
         scriptTrace.append("\n").append(line)
       }
       console.error(scriptTrace.toString())
     } else {
-      var funcs = Object.getOwnPropertyNames(e)
-      for (var idx in funcs) {
-        var func_name = funcs[idx]
+      let funcs = Object.getOwnPropertyNames(e)
+      for (let idx in funcs) {
+        let func_name = funcs[idx]
         console.verbose(func_name)
       }
     }
@@ -597,14 +613,14 @@ function convertArrayToRect (a) {
 }
 
 function calculateCoordinates (X, Y, data, img) {
-  var X = X - data.translate.x,
+  let X = X - data.translate.x,
     Y = Y - data.translate.y
-  var x = X / data.scale
-  var y = Y / data.scale
+  let x = X / data.scale
+  let y = Y / data.scale
   x = Math.floor((0 <= x && x < img.getWidth()) ? x : (0 <= x ? img.getWidth() - 1 : 0))
   y = Math.floor((0 <= y && y < img.getHeight()) ? y : (0 <= y ? img.getHeight() - 1 : 0))
-  var color = images.pixel(img, x, y)
-  var colorString = colors.toString(color)
+  let color = images.pixel(img, x, y)
+  let colorString = colors.toString(color)
   return {
     x: x,
     y: y,
@@ -614,13 +630,13 @@ function calculateCoordinates (X, Y, data, img) {
 }
 
 function getRealRegion (positions, data, img) {
-  var scaledPositions = [
+  let scaledPositions = [
     positions[0] - data.translate.x,
     positions[1] - data.translate.y,
     positions[2] - data.translate.x,
     positions[3] - data.translate.y
   ].map(v => v / data.scale)
-  var tmp
+  let tmp
   if (scaledPositions[0] > scaledPositions[2]) {
     tmp = scaledPositions[0]
     scaledPositions[0] = scaledPositions[2]
@@ -637,15 +653,15 @@ function getRealRegion (positions, data, img) {
   function rangeY (y) {
     return Math.floor((0 <= y && y < img.getHeight()) ? y : (0 <= y ? img.getHeight() - 1 : 0))
   }
-  var left = rangeX(scaledPositions[0])
-  var right = rangeX(scaledPositions[2])
-  var top = rangeY(scaledPositions[1])
-  var bottom = rangeY(scaledPositions[3])
+  let left = rangeX(scaledPositions[0])
+  let right = rangeX(scaledPositions[2])
+  let top = rangeY(scaledPositions[1])
+  let bottom = rangeY(scaledPositions[3])
   return { left: left, right: right, top: top, bottom: bottom, width: right - left, height: bottom - top }
 }
 
 function convertAndClip (positions, data, img) {
-  var { left, right, top, bottom, width, height } = getRealRegion(positions, data, img)
+  let { left, right, top, bottom, width, height } = getRealRegion(positions, data, img)
   displayPositions = [left, top, width, height].join(',')
   // console.log('截取范围：', left, right, top, bottom, displayPositions)
   if (width == 0 || height == 0) {
@@ -655,149 +671,160 @@ function convertAndClip (positions, data, img) {
 }
 
 
-var Touch = new Array
-var TouchData = new Array
-var Wx, Wy, fuzhiid = 0,
-  fuzhi = false
-var cutStartX, cutStartY, cutEndX, cutEndY
+let Touch = new Array
+let TouchData = new Array
+let Wx, Wy, copyId = 0,
+  isCoping = false
+let cutStartX, cutStartY, cutEndX, cutEndY
 canvasWindow.canvas.setOnTouchListener(function (view, event) {
   try {
     if (cutMode) {
-      var pointerCount = event.getPointerCount()
+      function _handleCutTouchDown (event) {
+        let i = Math.floor(event.getAction() / 256)
+        let X = event.getX(i)
+        let Y = event.getY(i)
+        id = event.getPointerId(i)
+        if (pointerCount == 1) {
+          cutStartX = event.getX(i)
+          cutStartY = event.getY(i)
+        }
+        Touch[id] = {
+          X: X - data.translate.x,
+          Y: Y - data.translate.y
+        }
+        //复制对象。
+        TouchData = deepCopy(data)
+      }
+      function _handleCutTouchMove (event) {
+        if (pointerCount == 1) {
+          cutEndX = event.getX(0)
+          cutEndY = event.getY(0)
+          positions = [cutStartX, cutStartY, cutEndX, cutEndY]
+        } else {
+          let id = event.getPointerId(0)
+          let X = event.getX(0)
+          let Y = event.getY(0)
+          let id1 = event.getPointerId(1)
+          let X1 = event.getX(1)
+          let Y1 = event.getY(1)
+          let touchStartDistance = getDistance(Touch[id1].X - Touch[id].X, Touch[id1].Y - Touch[id].Y)
+          let touchEndDistance = getDistance(X1 - X, Y1 - Y)
+          let scaleRate = touchEndDistance / touchStartDistance
+          data.scale = TouchData.scale * scaleRate
+          data.translate.x = X - Touch[id].X * scaleRate
+          data.translate.y = Y - Touch[id].Y * scaleRate
+        }
+      }
+      let pointerCount = event.getPointerCount()
       switch (event.getAction() <= 2 ? event.getAction() : Math.abs(event.getAction() % 2 - 1)) {
         case event.ACTION_DOWN:
-          var i = Math.floor(event.getAction() / 256)
-          var X = event.getX(i)
-          var Y = event.getY(i)
-          id = event.getPointerId(i)
-          if (pointerCount == 1) {
-            cutStartX = event.getX(i)
-            cutStartY = event.getY(i)
-          }
-          Touch[id] = {
-            X: X - data.translate.x,
-            Y: Y - data.translate.y
-          }
-          //复制对象。
-          TouchData = deepCopy(data)
+          _handleCutTouchDown(event)
           break
         case event.ACTION_MOVE:
-          if (pointerCount == 1) {
-            cutEndX = event.getX(0)
-            cutEndY = event.getY(0)
-            positions = [cutStartX, cutStartY, cutEndX, cutEndY]
-          } else {
-            var id = event.getPointerId(0)
-            var X = event.getX(0)
-            var Y = event.getY(0)
-            var id1 = event.getPointerId(1)
-            var X1 = event.getX(1)
-            var Y1 = event.getY(1)
-            var touchStartDistance = getDistance(Touch[id1].X - Touch[id].X, Touch[id1].Y - Touch[id].Y)
-            var touchEndDistance = getDistance(X1 - X, Y1 - Y)
-            var scaleRate = touchEndDistance / touchStartDistance
-            data.scale = TouchData.scale * scaleRate
-            data.translate.x = X - Touch[id].X * scaleRate
-            data.translate.y = Y - Touch[id].Y * scaleRate
-          }
+          _handleCutTouchMove(event)
           break
         case event.ACTION_UP:
-
           break
       }
     } else {
       positions = []
-      var i, id, PC
-      switch (event.getAction() <= 2 ? event.getAction() : Math.abs(event.getAction() % 2 - 1)) {
-        case event.ACTION_DOWN:
-          i = Math.floor(event.getAction() / 256)
-          id = event.getPointerId(i)
-          var X = event.getX(i)
-          var Y = event.getY(i)
-          if (getDistance(view.width / 2 - X, view.height / 2 - Y) <= 50) {
-            Wx = X
-            Wy = Y
-            fuzhi = true
-            fuzhiid = id
-            break
+      function _handleTouchDown (event) {
+        let i = Math.floor(event.getAction() / 256)
+        let id = event.getPointerId(i)
+        let X = event.getX(i)
+        let Y = event.getY(i)
+        if (getDistance(view.width / 2 - X, view.height / 2 - Y) <= 50) {
+          Wx = X
+          Wy = Y
+          isCoping = true
+          copyId = id
+          return
+        }
+        let PC = event.getPointerCount()
+        if (PC >= 3) {
+          data = {
+            translate: {
+              x: -(canvasWindow.getX() + canvasWindow.canvas.getX()),
+              y: -(canvasWindow.getY() + canvasWindow.canvas.getY())
+            },
+            scale: 1,
           }
-          PC = event.getPointerCount()
-          if (PC >= 3) {
-            data = {
-              translate: {
-                x: -(canvasWindow.getX() + canvasWindow.canvas.getX()),
-                y: -(canvasWindow.getY() + canvasWindow.canvas.getY())
-              },
-              scale: 1,
+        }
+        Touch[id] = {
+          X: X - data.translate.x,
+          Y: Y - data.translate.y
+        }
+        TouchData = deepCopy(data)
+      }
+      function _handleTouchMove (event) {
+        if (isCoping) {
+          return
+        }
+        PC = event.getPointerCount()
+        if (PC == 1) {
+          let id = event.getPointerId(0)
+          let X = event.getX(0)
+          let Y = event.getY(0)
+          data.translate.x = X - Touch[id].X
+          data.translate.y = Y - Touch[id].Y
+        } else if (PC == 2) {
+          let id = event.getPointerId(0)
+          let X = event.getX(0)
+          let Y = event.getY(0)
+          let id1 = event.getPointerId(1)
+          let X1 = event.getX(1)
+          let Y1 = event.getY(1)
+          let SS = getDistance(Touch[id1].X - Touch[id].X, Touch[id1].Y - Touch[id].Y)
+          let SS1 = getDistance(X1 - X, Y1 - Y)
+          let kS = SS1 / SS
+          data.scale = TouchData.scale * kS
+          data.translate.x = X - Touch[id].X * kS
+          data.translate.y = Y - Touch[id].Y * kS
+        } else {
+          data = {
+            translate: {
+              x: -(canvasWindow.getX() + canvasWindow.canvas.getX()),
+              y: -(canvasWindow.getY() + canvasWindow.canvas.getY())
+            },
+            scale: 1,
+          }
+        }
+      }
+      function _handleTouchUp (event) {
+        i = Math.floor(event.getAction() / 256)
+        id = event.getPointerId(i)
+        if (isCoping && id == copyId) {
+          if (getDistance(event.getX(i) - Wx, event.getY(i) - Wy) <= 10) {
+            setClip(JSON.stringify(globalPointColor))
+            toastLog("已复制 \n" + JSON.stringify(globalPointColor))
+          }
+          isCoping = false
+          return
+        }
+        Touch[id] = undefined
+        PC = event.getPointerCount()
+        for (let idx = 0; idx < PC; idx++) {
+          let id1 = event.getPointerId(idx)
+          let X = event.getX(idx)
+          let Y = event.getY(idx)
+          if (id1 != id) {
+            Touch[id1] = {
+              X: X - data.translate.x,
+              Y: Y - data.translate.y
             }
           }
-          Touch[id] = {
-            X: X - data.translate.x,
-            Y: Y - data.translate.y
-          }
-          TouchData = deepCopy(data)
+        }
+      }
+      switch (event.getAction() <= 2 ? event.getAction() : Math.abs(event.getAction() % 2 - 1)) {
+        case event.ACTION_DOWN:
+          _handleTouchDown(event)
           //复制对象。
           break
         case event.ACTION_MOVE:
-          if (fuzhi) {
-            break
-          }
-          PC = event.getPointerCount()
-          if (PC == 1) {
-            var id = event.getPointerId(0)
-            var X = event.getX(0)
-            var Y = event.getY(0)
-            data.translate.x = X - Touch[id].X
-            data.translate.y = Y - Touch[id].Y
-          } else if (PC == 2) {
-            var id = event.getPointerId(0)
-            var X = event.getX(0)
-            var Y = event.getY(0)
-            var id1 = event.getPointerId(1)
-            var X1 = event.getX(1)
-            var Y1 = event.getY(1)
-            var SS = getDistance(Touch[id1].X - Touch[id].X, Touch[id1].Y - Touch[id].Y)
-            var SS1 = getDistance(X1 - X, Y1 - Y)
-            var kS = SS1 / SS
-            data.scale = TouchData.scale * kS
-            data.translate.x = X - Touch[id].X * kS
-            data.translate.y = Y - Touch[id].Y * kS
-          } else {
-            data = {
-              translate: {
-                x: -(canvasWindow.getX() + canvasWindow.canvas.getX()),
-                y: -(canvasWindow.getY() + canvasWindow.canvas.getY())
-              },
-              scale: 1,
-            }
-          }
-
+          _handleTouchMove(event)
           break
         case event.ACTION_UP:
-          i = Math.floor(event.getAction() / 256)
-          id = event.getPointerId(i)
-          if (fuzhi && id == fuzhiid) {
-            if (getDistance(event.getX(i) - Wx, event.getY(i) - Wy) <= 10) {
-              setClip(JSON.stringify(globalPointColor))
-              toastLog("已复制 \n" + JSON.stringify(globalPointColor))
-            }
-            fuzhi = false
-            break
-          }
-          Touch[id] = undefined
-          PC = event.getPointerCount()
-          for (var idx = 0; idx < PC; idx++) {
-            var id1 = event.getPointerId(idx)
-            var X = event.getX(idx)
-            var Y = event.getY(idx)
-            if (id1 != id) {
-              Touch[id1] = {
-                X: X - data.translate.x,
-                Y: Y - data.translate.y
-              }
-            }
-          }
-          log(PC)
+          _handleTouchUp(event)
           break
       }
     }
@@ -846,8 +873,8 @@ function deepCopy (obj) {
   if (typeof obj != 'object') {
     return obj
   }
-  var newobj = {}
-  for (var attr in obj) {
+  let newobj = {}
+  for (let attr in obj) {
     newobj[attr] = deepCopy(obj[attr])
   }
   return newobj
@@ -859,36 +886,27 @@ function FloatyController (window, windowMoveId, isCanvasWinow) {
   this.width = this.orientation == 1 ? device_width : device_height
   this.height = this.orientation == 2 ? device_width : device_height
   this.isAutoIntScreen = true
-  this.Click = function () { }
-  this.move = function () { }
-  this.LongClick = function () { }
+  this.isHide = false
+  let EMPTY_FUNC = () => { }
+  this.Click = EMPTY_FUNC
+  this.move = EMPTY_FUNC
+  this.LongClick = EMPTY_FUNC
   this.setClick = (fun) => {
-    fun = fun || function () { }
+    fun = fun || EMPTY_FUNC
     this.Click = fun
   }
   this.setMove = (fun) => {
-    fun = fun || function () { }
+    fun = fun || EMPTY_FUNC
     this.move = fun
   }
   this.setLongClick = (fun, threshold) => {
-    fun = fun || function () { }
+    fun = fun || EMPTY_FUNC
     this.LongClick = fun
     if (parseInt(threshold)) {
       this.longClickThreshold = parseInt(threshold) / 50
     }
   }
-  setInterval(() => {
-    if (context.resources.configuration.orientation != this.orientation) {
-      this.orientation = context.resources.configuration.orientation
-      this.width = this.orientation == 1 ? device_width : device_height
-      this.height = this.orientation == 2 ? device_width : device_height
-      var xy = pointRangeBack(window.getX(), window.getY(), this.moveRange(window))
-      this.windowMoving([
-        [window.getX(), window.getY()],
-        [xy.x, xy.y]
-      ])
-    }
-  }, 100)
+
   this.windowStartX = 0
   this.windowStartY = 0
   this.eventStartX = 0
@@ -921,8 +939,8 @@ function FloatyController (window, windowMoveId, isCanvasWinow) {
             this.eventKeep = true; //按下,开启计时
             break
           case event.ACTION_MOVE:
-            var sx = event.getRawX() - this.eventStartX
-            var sy = event.getRawY() - this.eventStartY
+            let sx = event.getRawX() - this.eventStartX
+            let sy = event.getRawY() - this.eventStartY
             if (!this.eventMoving && this.eventKeep && getDistance(sx, sy) >= 10) {
               this.eventMoving = true
             }
@@ -965,7 +983,7 @@ function FloatyController (window, windowMoveId, isCanvasWinow) {
   }
   this.moveRange = (win, view) => {
     //返回悬浮窗的坐标范围。
-    var border = 36, //悬浮窗的隐形边矩
+    let border = 36, //悬浮窗的隐形边矩
       barHeight = 66, //手机通知栏的高度
       bottomHeight = 100; //虚拟按键的高度。(大概)
     if (!isCanvasWinow) {
@@ -997,14 +1015,14 @@ function FloatyController (window, windowMoveId, isCanvasWinow) {
   }
   this.windowMoving = (moveInfo) => {
     //移动悬浮窗的动画效果。
-    var sx = moveInfo.to.X - moveInfo.from.X,
+    let sx = moveInfo.to.X - moveInfo.from.X,
       sy = moveInfo.to.Y - moveInfo.from.Y
-    var sd = getDistance(sx, sy) / 10
-    var X = sx / sd,
+    let sd = getDistance(sx, sy) / 10
+    let X = sx / sd,
       Y = sy / sd
-    var x = 0,
+    let x = 0,
       y = 0
-    for (var i = 0; i < sd; i++) {
+    for (let i = 0; i < sd; i++) {
       x += X
       y += Y
       sleep(1)
@@ -1021,13 +1039,13 @@ function FloatyController (window, windowMoveId, isCanvasWinow) {
   }
   this.outScreen = () => {
     //算出最短的距离到达屏幕之外。
-    var moveRangeInfo = this.moveRange(window)
-    var x = window.getX(),
+    let moveRangeInfo = this.moveRange(window)
+    let x = window.getX(),
       y = window.getY()
-    var centerX = x + window.getWidth() / 2
-    var toLeft = centerX < this.width / 2
+    let centerX = x + window.getWidth() / 2
+    let toLeft = centerX < this.width / 2
     // 如果在左侧 向左移动（x+width） 右侧直接移动到屏幕外
-    var targetX = toLeft ? - (x + window.getWidth()) : this.width + 10
+    let targetX = toLeft ? - (x + window.getWidth()) : this.width + 10
     return convertArrayToReadable([
       [x, y],
       [targetX, y]
@@ -1035,13 +1053,13 @@ function FloatyController (window, windowMoveId, isCanvasWinow) {
   }
   this.toScreenEdge = () => {
     //返回到屏幕边缘的坐标。
-    var x = window.getX(),
+    let x = window.getX(),
       y = window.getY()
     console.log('当前位置：', x, y)
     // 中心点位置
-    var centerX = window.getX() + window.getWidth() / 2
+    let centerX = window.getX() + window.getWidth() / 2
     // 左侧贴坐标，右侧贴右边
-    var cx = centerX < this.width / 2 ? -window.getWidth() / 3 : (this.width - window.getWidth() / 2)
+    let cx = centerX < this.width / 2 ? -window.getWidth() / 3 : (this.width - window.getWidth() / 2)
     return convertArrayToReadable([
       [x, y],
       [cx, y]
@@ -1049,8 +1067,8 @@ function FloatyController (window, windowMoveId, isCanvasWinow) {
   }
   this.centerXY = (point) => {
     //返回距离中心位置的一个方形两个坐标。
-    var w = window.getWidth()
-    var h = window.getHeight()
+    let w = window.getWidth()
+    let h = window.getHeight()
     return {
       from: {
         X: point.X + w / 2,
@@ -1064,7 +1082,7 @@ function FloatyController (window, windowMoveId, isCanvasWinow) {
   }
   this.intoScreen = () => {
     //当悬浮超出屏幕之外之后进入的坐标。
-    var point = pointRangeBack(window.getX(), window.getY(), this.moveRange(window))
+    let point = pointRangeBack(window.getX(), window.getY(), this.moveRange(window))
     return convertArrayToReadable([
       [window.getX(), window.getY()],
       [point.x, point.y]
@@ -1072,7 +1090,7 @@ function FloatyController (window, windowMoveId, isCanvasWinow) {
   }
   this.viewIntoScreen = () => {
     //当悬浮超出屏幕之外之后进入的坐标。
-    var point = pointRangeBack(window.getX(), window.getY(), this.moveRange(window, windowMoveId))
+    let point = pointRangeBack(window.getX(), window.getY(), this.moveRange(window, windowMoveId))
     return convertArrayToReadable([
       [window.getX(), window.getY()],
       [point.x, point.y]
@@ -1082,3 +1100,24 @@ function FloatyController (window, windowMoveId, isCanvasWinow) {
     this.windowMoving(this.intoScreen())
   }))
 }
+let iconBase64 = "data:image/png;base64,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"
+let floatyButton = new FloatyButton({
+  logo_src: iconBase64,
+  menu2_text: '显',
+  menu2_on_click: function () {
+    floatyButton.runInThreadPool(function () {
+      if (canvasWindowCtrl.isHide) {
+        // 将canvas移动回屏幕内
+        ui.post(function () {
+          canvasWindow.canvas.setVisibility(View.VISIBLE)
+        })
+        canvasWindowCtrl.windowMoving({ from: { X: device_width, Y: canvasMove.to.Y }, to: canvasMove.from })
+        canvasWindowCtrl.windowMoving(canvasWindowCtrl.intoScreen())
+        canvasWindowCtrl.isHide = false
+      }
+    })
+  },
+  menu4_on_click: function () {
+    exit()
+  },
+})
