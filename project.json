@@ -5,6 +5,7 @@
         "build"
     ],
     "packageName": "com.tony.capture.snippet",
-    "versionName": "1.0.0",
-    "versionCode": 1
+    "versionName": "1.0.1",
+    "versionCode": 2,
+    "icon": "logo.png"
 }

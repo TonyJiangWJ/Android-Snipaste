@@ -83,7 +83,7 @@ function FloatyButton (options) {
     const but_data = {
       'logo': {
         name: "logo",//不可修改
-        src: options.logo_src || 'https://pro.autojs.org/images/logo.png',
+        src: options.logo_src || '@drawable/ic_android_eat_js',
       },
       'menu_1': {
         name: "menu_1",
@@ -232,7 +232,7 @@ function FloatyButton (options) {
      * 参数一个都不能少
      */
     var w_menu = floaty.rawWindow(
-      `<frame id="menu" w="${dp2px(menu_r)}px" h="${dp2px(menu_r)}px" visibility="gone" >//
+      `<frame id="menu" w="${dp2px(menu_r)}px" h="${dp2px(menu_r)}px" visibility="gone">
         <butLogo-layout name="${but_data.menu_1.name}" text="${but_data.menu_1.text}" src="${but_data.menu_1.src}" bg="${but_data.menu_1.bg}" layout_gravity="center" />
         <butLogo-layout name="${but_data.menu_2.name}" text="${but_data.menu_2.text}" src="${but_data.menu_2.src}" bg="${but_data.menu_2.bg}" layout_gravity="center" />
         <butLogo-layout name="${but_data.menu_3.name}" text="${but_data.menu_3.text}" src="${but_data.menu_3.src}" bg="${but_data.menu_3.bg}" layout_gravity="center" />
@@ -254,6 +254,7 @@ function FloatyButton (options) {
     )
     w_logo_a.setSize(-1, -1)
     w_logo_a.setTouchable(false)
+    w_logo_a._but.attr('visibility', 'gone')
 
     //计算menu菜单在圆上的X,Y值
     //计算每个菜单的角度
@@ -314,7 +315,7 @@ function FloatyButton (options) {
         sleep(50)
         ui.run(() => {
           w_logo.setPosition(X, _h * _z)
-          if (menu_switch) { animation_menu(w_menu.menu, true) }
+          if (menu_switch) { animation_menu(null, true) }
         })
       });
     }
@@ -339,7 +340,12 @@ function FloatyButton (options) {
         ui.run(function () {
           let animationX = [], animationY = [], slX = [], slY = [];
           animation_state = true;
-          E != undefined ? w_menu.menu.attr("alpha", "0") : w_menu.menu.attr("visibility", "visible")
+          if (E != undefined) {
+            w_menu.menu.attr("alpha", "0")
+            w_menu.menu.attr("visibility", "gone")
+          } else {
+            w_menu.menu.attr("visibility", "visible")
+          }
           but_orientation ? e = 1 : e = 0;
           if (menu_switch) {
             // log("关闭动画")
@@ -376,7 +382,12 @@ function FloatyButton (options) {
             sleep(animation_time + 10)
             animation_state = false;
             ui.run(function () {
-              menu_switch ? (menu_switch = false, w_menu.menu.attr("visibility", "gone"), w_menu.menu.attr("alpha", "1")) : menu_switch = true
+              if (menu_switch) {
+                w_menu.menu.attr("visibility", "gone")
+                w_menu.menu.attr("alpha", "1")
+                w_menu.setPosition(-(device.width || 1080), w_menu.getY())
+              }
+              menu_switch = !menu_switch
             })
           });
         })
@@ -416,7 +427,7 @@ function FloatyButton (options) {
         ui.run(() => {
           w_logo._but.attr("alpha", "0.4")
           w_logo_a._but.attr("alpha", "0")
-          w_logo_a._but.attr("visibility", "invisible")
+          w_logo_a._but.attr("visibility", "gone")
           //记录Y值所在百分比
           _z = (Math.round(w_logo.getY() / _h * 100) / 100)
           _this.runInThreadPool(function () {
@@ -486,6 +497,7 @@ function FloatyButton (options) {
   }
 
   events.on('exit', () => {
+    console.info('脚本执行结束，回收悬浮窗按钮资源')
     if (intent_CHANGED != null) {
       //关闭 屏幕旋转监听广播
       new ContextWrapper(context).unregisterReceiver(intent_CHANGED);

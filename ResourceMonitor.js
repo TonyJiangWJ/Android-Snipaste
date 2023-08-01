@@ -2,7 +2,7 @@
  * @Author: TonyJiangWJ
  * @Date: 2020-05-11 18:28:23
  * @Last Modified by: TonyJiangWJ
- * @Last Modified time: 2023-07-27 21:59:23
+ * @Last Modified time: 2023-08-01 16:27:27
  * @Description: 图片资源监听并自动回收
  */
 importClass(java.util.concurrent.ScheduledThreadPoolExecutor)
@@ -15,15 +15,15 @@ function isNullOrUndefined (val) {
 module.exports = function (__runtime__, scope) {
   if (typeof scope.resourceMonitor === 'undefined' || scope.resourceMonitor === null) {
     let _o_images = require('__images__.js')(__runtime__, scope)
-    console.verbose(['Is _origin_images null? {}.', isNullOrUndefined(_o_images)])
+    debugInfo(['Is _origin_images null? {}.', isNullOrUndefined(_o_images)])
     let availMem = device.getAvailMem()
-    console.verbose(['当前可用内存：{}b {}MB', availMem, (availMem / (1024 * 1024))])
+    debugInfo(['当前可用内存：{}b {}MB', availMem, (availMem / (1024 * 1024))])
     let imgSize = device.width * device.height * 10 / 8 / 1024 / 1024 / 2
-    console.verbose(['预估单张图片大小：{}MB', imgSize])
+    debugInfo(['预估单张图片大小：{}MB', imgSize])
     availMem = availMem > (imgSize * 100 * 1024 * 1024) ? (imgSize * 100 * 1024 * 1024) : availMem
     let maximumStore = availMem / (imgSize * 1024 * 1024)
     let halfStore = Math.ceil(maximumStore / 2)
-    console.verbose(['支持最大图片张数：{} 一半：{}', maximumStore, halfStore])
+    debugInfo(['支持最大图片张数：{} 一半：{}', maximumStore, halfStore])
     let scheduledExecutor = new ScheduledThreadPoolExecutor(1)
     function ResourceMonitor () {
       this.images = []
@@ -35,13 +35,13 @@ module.exports = function (__runtime__, scope) {
 
     ResourceMonitor.prototype.releaseAll = function (undelegated) {
       if (this.images !== null) {
-        console.verbose('释放图片，总数：' + (this.images.length + this.longHoldImages.length))
+        debugInfo('释放图片，总数：' + (this.images.length + this.longHoldImages.length))
         this.writeLock.lock()
         try {
           this.recycleImages(this.images.splice(0), true)
           this.recycleImages(this.longHoldImages.splice(0), true)
           if (undelegated) {
-            console.verbose('解除图像资源代理')
+            debugInfo('解除图像资源代理')
             this.images = null
             scope.images = _o_images
             scope.__asGlobal__(_o_images, ['captureScreen'])
@@ -58,7 +58,7 @@ module.exports = function (__runtime__, scope) {
       try {
         if (this.longHoldImages === null) {
           // this is only happen when engine stoped, just recycle img
-          console.verbose('检测到脚本已停止，直接回收图片')
+          debugInfo('检测到脚本已停止，直接回收图片')
           img.recycle()
           return
         }
@@ -66,20 +66,20 @@ module.exports = function (__runtime__, scope) {
           img: img,
           millis: new Date().getTime()
         })
-        //console.verbose('增加图片到长时间持有的监听列表，需要手动recycle，当前总数：' + this.longHoldImages.length)
+        //debugInfo('增加图片到长时间持有的监听列表，需要手动recycle，当前总数：' + this.longHoldImages.length)
       } finally {
         this.writeLock.unlock()
       }
     }
 
     ResourceMonitor.prototype.addImageToList = function (img) {
-      //console.verbose('准备获取图片资源锁')
+      //debugInfo('准备获取图片资源锁')
       this.writeLock.lock()
-      //console.verbose('获取图片资源锁成功')
+      //debugInfo('获取图片资源锁成功')
       try {
         if (this.images === null) {
           // this is only happen when engine stoped, just recycle img
-          console.verbose('检测到脚本已停止，直接回收图片')
+          debugInfo('检测到脚本已停止，直接回收图片')
           img.recycle()
           return
         }
@@ -87,7 +87,7 @@ module.exports = function (__runtime__, scope) {
           img: img,
           millis: new Date().getTime()
         })
-        //console.verbose('增加图片到监听列表，当前总数：' + this.images.length)
+        //debugInfo('增加图片到监听列表，当前总数：' + this.images.length)
         // 达到一定阈值后回收
         if (this.images.length > halfStore) {
           if (this.images.length > maximumStore) {
@@ -115,7 +115,7 @@ module.exports = function (__runtime__, scope) {
       delay = delay || 5
       scheduledExecutor.schedule(new java.lang.Runnable({
         run: function () {
-          //console.verbose(['延迟回收图片 延迟时间：{}s', delay])
+          //debugInfo(['延迟回收图片 延迟时间：{}s', delay])
           img && img.recycle()
         }
       }), new java.lang.Long(delay), TimeUnit.SECONDS)
@@ -130,7 +130,7 @@ module.exports = function (__runtime__, scope) {
           if (imgBitmap && !imgBitmap.isRecycled()) {
             imageInfo.img.recycle()
           } else {
-            //console.verbose('图片已回收，不再回收')
+            //debugInfo('图片已回收，不再回收')
             count++
           }
         } catch (e) {
@@ -138,7 +138,7 @@ module.exports = function (__runtime__, scope) {
           count++
         }
       })
-      console.verbose(['{}，总数：{}，耗时：{}ms {}', desc, forRecycleList.length, (new Date().getTime() - start), (count > 0 ? ', 其中有：' + count + '自动释放了' : '')])
+      debugInfo(['{}，总数：{}，耗时：{}ms {}', desc, forRecycleList.length, (new Date().getTime() - start), (count > 0 ? ', 其中有：' + count + '自动释放了' : '')])
       forRecycleList = null
     }
 
@@ -167,9 +167,9 @@ module.exports = function (__runtime__, scope) {
 
       M_Images.prototype.captureScreen = function () {
         let start = new Date().getTime()
-        //console.verbose('准备获取截图')
+        //debugInfo('准备获取截图')
         let img = _o_images.captureScreen()
-        //console.verbose(['获取截图完成，耗时{}ms', (new Date().getTime() - start)])
+        //debugInfo(['获取截图完成，耗时{}ms', (new Date().getTime() - start)])
         // captureScreen的不需要回收
         // that.addImageToList(img)
         return img
@@ -333,14 +333,14 @@ module.exports = function (__runtime__, scope) {
       for (let idx in newFuncs) {
         let func_name = newFuncs[idx]
         if (func_name !== 'constructor' && func_name !== 'init') {
-          // console.verbose('override function: ' + func_name)
+          // debugInfo('override function: ' + func_name)
           newImages[func_name] = mImages[func_name]
         }
       }
-      console.verbose('图片资源代理创建完毕，准备替换scope中的images')
+      debugInfo('图片资源代理创建完毕，准备替换scope中的images')
       scope.images = newImages
       scope.__asGlobal__(mImages, ['captureScreen'])
-      console.verbose('图片资源代理替换images完毕')
+      debugInfo('图片资源代理替换images完毕')
     }
 
     let resourceMonitor = new ResourceMonitor()
@@ -351,7 +351,49 @@ module.exports = function (__runtime__, scope) {
     })
 
     scope.resourceMonitor = resourceMonitor
+
+
   }
 
+  function debugInfo (content) {
+    if (scope.showDebugLog) {
+      console.verbose(convertObjectContent(content))
+    }
+  }
   return scope.resourceMonitor
+}
+
+
+/**
+ * 格式化输入参数 eg. `['args: {} {} {}', 'arg1', 'arg2', 'arg3']` => `'args: arg1 arg2 arg3'`
+ * @param {array} originContent 输入参数
+ */
+function convertObjectContent (originContent) {
+  if (typeof originContent === 'string') {
+    return originContent
+  } else if (Array.isArray(originContent)) {
+    let marker = originContent[0]
+    let args = originContent.slice(1)
+    if (Array.isArray(args) && args.length > 0) {
+      args = args.map(r => {
+        if (typeof r === 'function') {
+          return r()
+        } else {
+          return r
+        }
+      })
+    }
+    let regex = /(\{\})/g
+    let matchResult = marker.match(regex)
+    if (matchResult && args && matchResult.length > 0 && matchResult.length === args.length) {
+      args.forEach((item, idx) => {
+        marker = marker.replace('{}', item)
+      })
+      return marker
+    } else if (matchResult === null) {
+      return marker
+    }
+  }
+  console.error(ENGINE_ID + ' 参数不匹配[' + JSON.stringify(originContent) + ']')
+  return originContent
 }
